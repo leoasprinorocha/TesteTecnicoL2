@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using TesteTecnicoL2.Domain.Embalagens.CaixasDisponiveis;
+﻿using TesteTecnicoL2.Domain.Embalagens.CaixasDisponiveis;
 using TesteTecnicoL2.Domain.Produtos;
 
 namespace TesteTecnicoL2.Domain.Embalagens
@@ -29,7 +28,17 @@ namespace TesteTecnicoL2.Domain.Embalagens
 
             TentaDistribuirProdutosSemCaixaEmCaixasComEspacoSobrando(ref produtos, ref caixas);
 
-            CriaNovasCaixasParaProdutosRestantesQueNaoCouberamNasCaixasComEspacosVazios(produtos, ref caixas);
+            CriaNovasCaixasParaProdutosRestantesQueNaoCouberamNasCaixasComEspacosVazios(ref produtos, ref caixas);
+
+            if (produtos.Any() && !caixas.Any())
+            {
+                caixas.Add(new Caixa3()
+                {
+                    Observacao = "Produto não cabe em nenhuma caixa disponível",
+                    Modelo = null,
+                    Produtos = produtos.Select(a => a.ProdutoId).ToList()
+                });
+            }
 
             return caixas;
 
@@ -51,10 +60,9 @@ namespace TesteTecnicoL2.Domain.Embalagens
                 }
             }
 
-
         }
 
-        private void CriaNovasCaixasParaProdutosRestantesQueNaoCouberamNasCaixasComEspacosVazios(List<Produto> produtos, ref List<Caixa> caixas)
+        private void CriaNovasCaixasParaProdutosRestantesQueNaoCouberamNasCaixasComEspacosVazios(ref List<Produto> produtos, ref List<Caixa> caixas)
         {
             if (produtos.Any())
             {
@@ -80,7 +88,8 @@ namespace TesteTecnicoL2.Domain.Embalagens
                 if (produtosQueCabemEmCaixa3.Any())
                 {
                     Caixa3 caixa3 = new();
-                    caixa3.Produtos = produtosQueCabemEmCaixa2.Select(a => a.ProdutoId).ToList();
+                    caixa3.Produtos = produtosQueCabemEmCaixa3.Select(a => a.ProdutoId).ToList();
+                    produtos.RemoveAll(a => produtosQueCabemEmCaixa3.Select(b => b.ProdutoId).Contains(a.ProdutoId));
                     caixas.Add(caixa3);
 
                 }
@@ -105,7 +114,6 @@ namespace TesteTecnicoL2.Domain.Embalagens
                 }
                 else
                 {
-
                     break;
                 }
 
@@ -184,7 +192,7 @@ namespace TesteTecnicoL2.Domain.Embalagens
             return produtosPreparadosCaixa1;
         }
 
-        public List<Produto> RetornaProdutosDaListaConsiderandoSomaLimiteDeMetrosCubicos(List<Produto> produtos, double tamanhoLimite)
+        private List<Produto> RetornaProdutosDaListaConsiderandoSomaLimiteDeMetrosCubicos(List<Produto> produtos, double tamanhoLimite)
         {
             List<Produto> produtosSelecionados = new();
             double metrosCubicosDosProdutos = 0;

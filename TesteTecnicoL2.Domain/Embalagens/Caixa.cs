@@ -10,5 +10,6 @@ namespace TesteTecnicoL2.Domain.Embalagens
         public virtual string Modelo { get; set; }
         public virtual double EspacoRestante { get; set; }
         public virtual List<string> Produtos { get; set; }
+        public virtual string Observacao { get; set; }
     }
 }

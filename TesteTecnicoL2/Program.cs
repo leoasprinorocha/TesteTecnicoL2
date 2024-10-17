@@ -1,44 +1,115 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+using System.Text.Json;
+using TesteTecnicoL2.Application.Applications;
+using TesteTecnicoL2.Application.Applications.Interfaces;
+using TesteTecnicoL2.Application.Dtos;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Serviço empacotamento de produtos", Version = "v1" });
+
+    // Configure Bearer Token Authentication
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Por favor insira o token",
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
+#region DI application container
+builder.Services.AddScoped<IEntradaPedidoApplication, EntradaPedidoApplication>();
+#endregion
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "GerenciaFood", 
+            ValidAudience = "https://localhost",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("PEREJICOMIPEREJICENE"))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+HttpContent GetHttpContent<T>(T obj)
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    // Serialize the object to JSON
+    var json = JsonSerializer.Serialize(obj);
 
-app.MapGet("/weatherforecast", () =>
+    // Create and return HttpContent from the JSON string
+    return new StringContent(json, Encoding.UTF8, "application/json");
+}
+
+
+app.MapPost("/autenticar", [AllowAnonymous] async (string email, string senha) =>
 {
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    using HttpClient client = new HttpClient();
+    client.BaseAddress = new Uri("https://localhost:44325/");
+    var paramsLogin = new { email = email, password = senha };
+    var response = await client.PostAsync("authentication/login", GetHttpContent(paramsLogin));
+    response.EnsureSuccessStatusCode();
+    var responseString = await response.Content.ReadAsStringAsync();
+    return Results.Ok(responseString);
 })
-.WithName("GetWeatherForecast")
+.WithName("Autenticar")
 .WithOpenApi();
+
+
+app.MapPost("/processarpedidos", [AllowAnonymous] async (PedidoDto pedido, IEntradaPedidoApplication entradaPedidoApplication) =>
+{
+    var pedidosProcessados = await entradaPedidoApplication.RealizaProcessamentoDosPedidos(pedido.pedidos);
+    return Results.Ok(pedidosProcessados);
+})
+.WithName("ProcessaPedidos")
+.WithOpenApi();
+
 
 app.Run();
 
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
